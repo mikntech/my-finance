@@ -72,31 +72,22 @@ async function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function parseNumericId(id: unknown): number | undefined {
-  if (typeof id === 'number' && Number.isFinite(id)) return id;
-  if (typeof id === 'string') {
-    const n = Number(id);
-    if (Number.isFinite(n)) return n;
-  }
-  return undefined;
-}
-
-async function findCustomerIdByIdentifier(identifier: string): Promise<number | undefined> {
+async function findCustomerIdByIdentifier(identifier: string): Promise<string | undefined> {
   // 1) Direct search
   try {
     const res = await saltedgeGet(
       `/customers?search[identifier]=${encodeURIComponent(identifier)}&per_page=100`
     );
-    const id = parseNumericId(res?.data?.[0]?.id);
-    if (typeof id === 'number') return id;
+    const id = res?.data?.[0]?.id;
+    if (typeof id === 'string' && id.length > 0) return id;
   } catch {}
   // 1b) Alternate query param form seen in some gateways
   try {
     const res = await saltedgeGet(
       `/customers?identifier=${encodeURIComponent(identifier)}&per_page=100`
     );
-    const id = parseNumericId(res?.data?.[0]?.id);
-    if (typeof id === 'number') return id;
+    const id = res?.data?.[0]?.id;
+    if (typeof id === 'string' && id.length > 0) return id;
   } catch {}
   // 2) Paginate list (handles accounts with multiple customers)
   let nextPath: string | undefined = '/customers?per_page=100';
@@ -104,8 +95,8 @@ async function findCustomerIdByIdentifier(identifier: string): Promise<number | 
     const res = await saltedgeGet(nextPath);
     const list = Array.isArray(res?.data) ? res.data : [];
     const match = list.find((c: any) => c?.identifier === identifier);
-    const parsed = parseNumericId(match?.id);
-    if (typeof parsed === 'number') return parsed;
+    const parsed = match?.id;
+    if (typeof parsed === 'string' && parsed.length > 0) return parsed;
     const meta = res?.meta || {};
     if (meta?.next_page) nextPath = `/customers?page=${meta.next_page}&per_page=100`;
     else if (meta?.next_id) nextPath = `/customers?from_id=${meta.next_id}&per_page=100`;
@@ -117,11 +108,11 @@ async function findCustomerIdByIdentifier(identifier: string): Promise<number | 
   return undefined;
 }
 
-async function getOrCreateCustomerId(identifier: string): Promise<number> {
+async function getOrCreateCustomerId(identifier: string): Promise<string> {
   try {
     const created = await saltedgeRequest('/customers', { data: { identifier } });
-    const id = parseNumericId(created?.data?.id);
-    if (typeof id === 'number') return id;
+    const id = created?.data?.id;
+    if (typeof id === 'string' && id.length > 0) return id;
   } catch (e: any) {
     const msg = String(e?.message || '');
     const isDuplicate =
@@ -131,7 +122,8 @@ async function getOrCreateCustomerId(identifier: string): Promise<number> {
     if (!isDuplicate) throw e;
   }
   const id = await findCustomerIdByIdentifier(identifier);
-  if (typeof id !== 'number') throw new Error('Could not resolve Salt Edge customer_id');
+  if (typeof id !== 'string' || id.length === 0)
+    throw new Error('Could not resolve Salt Edge customer_id');
   return id;
 }
 
@@ -165,7 +157,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       const redirect_url_success = `https://${process.env.APP_DOMAIN || 'app.the-libs.com'}/connect/success`;
       const payload: any = {
         data: {
-          customer_id, // numeric id
+          customer_id, // keep as string to preserve precision
           country_code,
           attempt: { return_to: redirect_url_success },
           ...(provider_code ? { provider_code } : {}),
