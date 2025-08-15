@@ -185,6 +185,10 @@ export class CoreStack extends cdk.Stack {
       defaultRootObject: 'index.html',
       domainNames: [appDomain],
       certificate: appCert,
+      errorResponses: [
+        { httpStatus: 404, responseHttpStatus: 200, responsePagePath: '/index.html' },
+        { httpStatus: 403, responseHttpStatus: 200, responsePagePath: '/index.html' },
+      ],
     });
     new route53.ARecord(this, 'AppAliasRecord', {
       zone: hostedZone,
