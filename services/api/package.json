@@ -11,15 +11,18 @@
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.611.0",
-    "@aws-sdk/util-dynamodb": "^3.611.0"
+    "@aws-sdk/util-dynamodb": "^3.611.0",
+    "crypto": "^1.0.1"
   },
   "devDependencies": {
-    "@types/aws-lambda": "^8.10.137",
-    "esbuild": "^0.21.5",
-    "typescript": "^5.4.5",
-    "eslint": "^9.9.0",
-    "@typescript-eslint/parser": "^7.17.0",
+    "@types/aws-lambda": "^8.10.152",
+    "@types/node": "^20.19.11",
     "@typescript-eslint/eslint-plugin": "^7.17.0",
-    "eslint-config-prettier": "^9.1.0"
+    "@typescript-eslint/parser": "^7.17.0",
+    "esbuild": "^0.21.5",
+    "eslint": "^9.9.0",
+    "eslint-config-prettier": "^9.1.0",
+    "typescript": "^5.4.5",
+    "undici-types": "^7.13.0"
   }
 }
