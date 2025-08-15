@@ -13,6 +13,7 @@ import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as route53targets from "aws-cdk-lib/aws-route53-targets";
+import * as ec2 from "aws-cdk-lib/aws-ec2";
 
 export class CoreStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -64,6 +65,29 @@ export class CoreStack extends cdk.Stack {
       generateSecret: false,
     });
 
+    // VPC with fixed egress IP via NAT Gateway (Elastic IP)
+    const natEip = new ec2.CfnEIP(this, "NatEip", { domain: "vpc" });
+    const vpc = new ec2.Vpc(this, "Vpc", {
+      natGatewayProvider: ec2.NatProvider.gateway({
+        eipAllocationIds: [natEip.attrAllocationId],
+      }),
+      natGateways: 1,
+      maxAzs: 2,
+      subnetConfiguration: [
+        { name: "public", subnetType: ec2.SubnetType.PUBLIC },
+        {
+          name: "private-egress",
+          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        },
+      ],
+    });
+    vpc.addGatewayEndpoint("DynamoDbEndpoint", {
+      service: ec2.GatewayVpcEndpointAwsService.DYNAMODB,
+    });
+    vpc.addGatewayEndpoint("S3Endpoint", {
+      service: ec2.GatewayVpcEndpointAwsService.S3,
+    });
+
     const apiHandler = new lambda.Function(this, "ApiHandler", {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "index.handler",
@@ -73,6 +97,8 @@ export class CoreStack extends cdk.Stack {
         BUCKET_NAME: statementsBucket.bucketName,
         REGION: this.region,
       },
+      vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
     });
     table.grantReadWriteData(apiHandler);
     statementsBucket.grantReadWrite(apiHandler);
@@ -226,6 +252,7 @@ export class CoreStack extends cdk.Stack {
       ),
     });
 
+    new cdk.CfnOutput(this, "StaticEgressIp", { value: natEip.attrPublicIp });
     new cdk.CfnOutput(this, "ApiUrl", { value: api.url ?? "" });
     new cdk.CfnOutput(this, "ApiCustomDomainUrl", {
       value: `https://${apiDomainNameValue}`,
