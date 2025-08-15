@@ -10,6 +10,9 @@ import * as apigw from "aws-cdk-lib/aws-apigateway";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as events from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
+import * as acm from "aws-cdk-lib/aws-certificatemanager";
+import * as route53 from "aws-cdk-lib/aws-route53";
+import * as route53targets from "aws-cdk-lib/aws-route53-targets";
 
 export class CoreStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -97,6 +100,10 @@ export class CoreStack extends cdk.Stack {
       authorizer,
       authorizationType: apigw.AuthorizationType.COGNITO,
     });
+    tx.addMethod("PUT", new apigw.LambdaIntegration(apiHandler), {
+      authorizer,
+      authorizationType: apigw.AuthorizationType.COGNITO,
+    });
     const budgets = v1.addResource("budgets");
     budgets.addMethod("GET", new apigw.LambdaIntegration(apiHandler), {
       authorizer,
@@ -143,6 +150,19 @@ export class CoreStack extends cdk.Stack {
     });
     nightly.addTarget(new targets.LambdaFunction(apiHandler));
 
+    // DNS & Certificates (custom domains)
+    const rootDomain = "the-libs.com";
+    const hostedZoneId = "Z01810511E7Q1XG0MN91O";
+    const hostedZone = route53.HostedZone.fromHostedZoneAttributes(
+      this,
+      "HostedZone",
+      {
+        hostedZoneId,
+        zoneName: rootDomain,
+      }
+    );
+
+    // Frontend hosting (S3 + CloudFront) with custom domain app.the-libs.com
     const webBucket = new s3.Bucket(this, "WebBucket", {
       publicReadAccess: false,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -153,12 +173,28 @@ export class CoreStack extends cdk.Stack {
     });
     const oai = new cloudfront.OriginAccessIdentity(this, "WebOAI");
     webBucket.grantRead(oai);
+    const appDomain = `app.${rootDomain}`;
+    const appCert = new acm.DnsValidatedCertificate(this, "AppCert", {
+      domainName: appDomain,
+      hostedZone,
+      region: "us-east-1",
+    });
     const distro = new cloudfront.Distribution(this, "WebDistro", {
       defaultBehavior: {
         origin: new origins.S3Origin(webBucket, { originAccessIdentity: oai }),
       },
       defaultRootObject: "index.html",
+      domainNames: [appDomain],
+      certificate: appCert,
     });
+    new route53.ARecord(this, "AppAliasRecord", {
+      zone: hostedZone,
+      recordName: appDomain,
+      target: route53.RecordTarget.fromAlias(
+        new route53targets.CloudFrontTarget(distro)
+      ),
+    });
+
     new s3deploy.BucketDeployment(this, "DeployWeb", {
       sources: [s3deploy.Source.asset("../web/dist")],
       destinationBucket: webBucket,
@@ -166,10 +202,38 @@ export class CoreStack extends cdk.Stack {
       distributionPaths: ["/*"],
     });
 
+    // API custom domain api.the-libs.com
+    const apiDomainNameValue = `api.${rootDomain}`;
+    const apiCert = new acm.DnsValidatedCertificate(this, "ApiCert", {
+      domainName: apiDomainNameValue,
+      hostedZone,
+    });
+    const apiDomainName = new apigw.DomainName(this, "ApiCustomDomain", {
+      domainName: apiDomainNameValue,
+      certificate: apiCert,
+      securityPolicy: apigw.SecurityPolicy.TLS_1_2,
+    });
+    new apigw.BasePathMapping(this, "ApiBasePath", {
+      domainName: apiDomainName,
+      restApi: api,
+      stage: api.deploymentStage,
+    });
+    new route53.ARecord(this, "ApiAliasRecord", {
+      zone: hostedZone,
+      recordName: apiDomainNameValue,
+      target: route53.RecordTarget.fromAlias(
+        new route53targets.ApiGatewayDomain(apiDomainName)
+      ),
+    });
+
     new cdk.CfnOutput(this, "ApiUrl", { value: api.url ?? "" });
+    new cdk.CfnOutput(this, "ApiCustomDomain", {
+      value: `https://${apiDomainNameValue}`,
+    });
     new cdk.CfnOutput(this, "CloudFrontUrl", {
       value: "https://" + distro.domainName,
     });
+    new cdk.CfnOutput(this, "AppDomain", { value: `https://${appDomain}` });
     new cdk.CfnOutput(this, "UserPoolId", { value: userPool.userPoolId });
     new cdk.CfnOutput(this, "UserPoolClientId", {
       value: userPoolClient.userPoolClientId,

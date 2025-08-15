@@ -3,6 +3,7 @@ import {
   DynamoDBClient,
   QueryCommand,
   PutItemCommand,
+  UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import { marshall, unmarshall } from "@aws-sdk/util-dynamodb";
 import { randomUUID } from "crypto";
@@ -50,6 +51,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     const item: Record<string, any> = {
       pk: `USER#${userId}`,
       sk: `TX#${now.toISOString().slice(0, 10)}#${id}`,
+      id,
       gsi1pk: `USER#${userId}#MONTH#${yyyymm}`,
       gsi1sk: `${now.toISOString()}#${id}`,
       amountNis: body.amountNis,
@@ -66,7 +68,41 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     await ddb.send(
       new PutItemCommand({ TableName: TABLE, Item: marshall(item) })
     );
-    return { statusCode: 201, body: JSON.stringify({ ok: true, id }) };
+    return {
+      statusCode: 201,
+      body: JSON.stringify({ ok: true, id, sk: item.sk }),
+    };
+  }
+
+  if (path.endsWith("/transactions") && httpMethod === "PUT") {
+    const body = JSON.parse(event.body ?? "{}");
+    const sk = body.sk as string | undefined;
+    if (!sk) return { statusCode: 400, body: "Missing sk" };
+    const updates: string[] = [];
+    const names: Record<string, any> = {};
+    const values: Record<string, any> = {};
+    function addUpdate(attr: string, value: any) {
+      const nameKey = `#${attr}`;
+      const valueKey = `:${attr}`;
+      names[nameKey] = attr;
+      values[valueKey] = marshall({ v: value }).v;
+      updates.push(`${nameKey} = ${valueKey}`);
+    }
+    if (body.category !== undefined) addUpdate("category", body.category);
+    if (body.merchantClean !== undefined)
+      addUpdate("merchantClean", body.merchantClean);
+    if (updates.length === 0)
+      return { statusCode: 400, body: "No updatable fields" };
+    await ddb.send(
+      new UpdateItemCommand({
+        TableName: TABLE,
+        Key: marshall({ pk: `USER#${userId}`, sk }),
+        UpdateExpression: "SET " + updates.join(", "),
+        ExpressionAttributeNames: names,
+        ExpressionAttributeValues: values,
+      })
+    );
+    return { statusCode: 200, body: JSON.stringify({ ok: true }) };
   }
 
   if (path.endsWith("/budgets") && httpMethod === "GET") {

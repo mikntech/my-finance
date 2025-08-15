@@ -1,7 +1,32 @@
 import { useEffect, useState } from "react";
-import { Button, Container, Typography } from "@mui/material";
+import {
+  AppBar,
+  BottomNavigation,
+  BottomNavigationAction,
+  Box,
+  Button,
+  Container,
+  CssBaseline,
+  Paper,
+  Toolbar,
+  Typography,
+} from "@mui/material";
+import SettingsIcon from "@mui/icons-material/Settings";
+import ListAltIcon from "@mui/icons-material/ListAlt";
+import InsightsIcon from "@mui/icons-material/Insights";
 
-export default function App() {
+function SettingsPage() {
+  return (
+    <Container sx={{ py: 2 }}>
+      <Typography variant="h5" gutterBottom>
+        הגדרות
+      </Typography>
+      <Typography>חיבור בנקים וחברות אשראי (ממשק יתווסף בהמשך).</Typography>
+    </Container>
+  );
+}
+
+function TransactionsPage() {
   const [items, setItems] = useState<any[]>([]);
   async function load() {
     const token = localStorage.getItem("idToken") || "";
@@ -15,14 +40,58 @@ export default function App() {
     void load();
   }, []);
   return (
-    <Container sx={{ py: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        דשבורד הוצאות
+    <Container sx={{ py: 2 }}>
+      <Typography variant="h5" gutterBottom>
+        תנועות
       </Typography>
       <Button variant="contained" onClick={() => void load()}>
         רענון
       </Button>
-      <pre>{JSON.stringify(items.slice(0, 5), null, 2)}</pre>
+      <pre style={{ fontSize: 12 }}>
+        {JSON.stringify(items.slice(0, 10), null, 2)}
+      </pre>
     </Container>
+  );
+}
+
+function StatsPage() {
+  return (
+    <Container sx={{ py: 2 }}>
+      <Typography variant="h5" gutterBottom>
+        סטטיסטיקות
+      </Typography>
+      <Typography>דוחות חודשיים, פילוח לפי קטגוריה ומשלם — בקרוב.</Typography>
+    </Container>
+  );
+}
+
+export default function App() {
+  const [tab, setTab] = useState(1); // 0: settings, 1: txs, 2: stats
+  return (
+    <Box sx={{ pb: 7 }}>
+      <CssBaseline />
+      <AppBar position="static" color="primary">
+        <Toolbar>
+          <Typography variant="h6" component="div">
+            הכסף שלי
+          </Typography>
+        </Toolbar>
+      </AppBar>
+
+      {tab === 0 && <SettingsPage />}
+      {tab === 1 && <TransactionsPage />}
+      {tab === 2 && <StatsPage />}
+
+      <Paper
+        sx={{ position: "fixed", bottom: 0, left: 0, right: 0 }}
+        elevation={3}
+      >
+        <BottomNavigation value={tab} onChange={(_, v) => setTab(v)} showLabels>
+          <BottomNavigationAction label="הגדרות" icon={<SettingsIcon />} />
+          <BottomNavigationAction label="תנועות" icon={<ListAltIcon />} />
+          <BottomNavigationAction label="סטטיסטיקות" icon={<InsightsIcon />} />
+        </BottomNavigation>
+      </Paper>
+    </Box>
   );
 }
