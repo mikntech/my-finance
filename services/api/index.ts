@@ -76,22 +76,21 @@ async function findCustomerIdByIdentifier(identifier: string): Promise<number | 
   // 1) Direct search
   try {
     const res = await saltedgeGet(
-      `/customers?search[identifier]=${encodeURIComponent(identifier)}&per_page=100`
+      `/clients/customers?search[identifier]=${encodeURIComponent(identifier)}&per_page=100`
     );
     const id = res?.data?.[0]?.id;
     if (typeof id === 'number') return id;
   } catch {}
   // 2) Paginate list (handles accounts with multiple customers)
-  let nextPath: string | undefined = '/customers?per_page=100';
+  let nextPath: string | undefined = '/clients/customers?per_page=100';
   for (let i = 0; i < 10 && nextPath; i++) {
     const res = await saltedgeGet(nextPath);
     const list = Array.isArray(res?.data) ? res.data : [];
     const match = list.find((c: any) => c?.identifier === identifier);
     if (match?.id && typeof match.id === 'number') return match.id;
     const meta = res?.meta || {};
-    // support different pagination styles (next_page, next_id, links.next)
-    if (meta?.next_page) nextPath = `/customers?page=${meta.next_page}&per_page=100`;
-    else if (meta?.next_id) nextPath = `/customers?from_id=${meta.next_id}&per_page=100`;
+    if (meta?.next_page) nextPath = `/clients/customers?page=${meta.next_page}&per_page=100`;
+    else if (meta?.next_id) nextPath = `/clients/customers?from_id=${meta.next_id}&per_page=100`;
     else if (res?.links?.next)
       nextPath = String(res.links.next).replace('https://www.saltedge.com/api/v5', '');
     else nextPath = undefined;
@@ -102,7 +101,7 @@ async function findCustomerIdByIdentifier(identifier: string): Promise<number | 
 
 async function getOrCreateCustomerId(identifier: string): Promise<number> {
   try {
-    const created = await saltedgeRequest('/customers', { data: { identifier } });
+    const created = await saltedgeRequest('/clients/customers', { data: { identifier } });
     const id = created?.data?.id;
     if (typeof id === 'number') return id;
   } catch (e: any) {
