@@ -39,6 +39,9 @@ jobs:
       - name: Create web .env (hardcoded)
         run: |
           echo "VITE_API_URL=https://api.the-libs.com" > web/.env
+          echo "VITE_COGNITO_USER_POOL_ID=eu-central-1_kMZhsbha1" >> web/.env
+          echo "VITE_COGNITO_CLIENT_ID=5c2u06iqo1cfeh4t0f6d9d8cg6" >> web/.env
+          echo "VITE_COGNITO_DOMAIN=tem.auth.eu-central-1.amazoncognito.com" >> web/.env
 
       - name: Build API
         run: pnpm --filter il-pfm-api build
