@@ -250,7 +250,11 @@ export class CoreStack extends cdk.Stack {
               `https://${distro.domainName}/`,
               'http://localhost:5173/',
             ],
-            scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
+            scopes: [
+              cognito.OAuthScope.OPENID,
+              cognito.OAuthScope.EMAIL,
+              cognito.OAuthScope.PROFILE,
+            ],
           },
           generateSecret: false,
         });
@@ -284,8 +288,12 @@ export class CoreStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'AppDomain', { value: `https://${appDomain}` });
     if (!existingUserPoolId) {
       new cdk.CfnOutput(this, 'UserPoolId', { value: (userPool as cognito.UserPool).userPoolId });
-      new cdk.CfnOutput(this, 'UserPoolClientId', { value: (userPoolClient as cognito.UserPoolClient).userPoolClientId });
-      new cdk.CfnOutput(this, 'HostedUiDomain', { value: (hostedDomain as cognito.UserPoolDomain).baseUrl() });
+      new cdk.CfnOutput(this, 'UserPoolClientId', {
+        value: (userPoolClient as cognito.UserPoolClient).userPoolClientId,
+      });
+      new cdk.CfnOutput(this, 'HostedUiDomain', {
+        value: (hostedDomain as cognito.UserPoolDomain).baseUrl(),
+      });
     }
   }
 }
