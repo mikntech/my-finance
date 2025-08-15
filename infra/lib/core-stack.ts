@@ -59,34 +59,23 @@ export class CoreStack extends cdk.Stack {
       mfa: cognito.Mfa.OFF,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
-    const userPoolClient = new cognito.UserPoolClient(this, 'UserPoolClient', {
-      userPool,
-      authFlows: { userPassword: true },
-      generateSecret: false,
-    });
+    // NOTE: UserPoolClient will be created later after we know callback URLs
 
     // VPC with fixed egress IP via NAT Gateway (Elastic IP)
     const natEip = new ec2.CfnEIP(this, 'NatEip', { domain: 'vpc' });
     const vpc = new ec2.Vpc(this, 'Vpc', {
-      natGatewayProvider: ec2.NatProvider.gateway({
-        eipAllocationIds: [natEip.attrAllocationId],
-      }),
+      natGatewayProvider: ec2.NatProvider.gateway({ eipAllocationIds: [natEip.attrAllocationId] }),
       natGateways: 1,
       maxAzs: 2,
       subnetConfiguration: [
         { name: 'public', subnetType: ec2.SubnetType.PUBLIC },
-        {
-          name: 'private-egress',
-          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-        },
+        { name: 'private-egress', subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       ],
     });
     vpc.addGatewayEndpoint('DynamoDbEndpoint', {
       service: ec2.GatewayVpcEndpointAwsService.DYNAMODB,
     });
-    vpc.addGatewayEndpoint('S3Endpoint', {
-      service: ec2.GatewayVpcEndpointAwsService.S3,
-    });
+    vpc.addGatewayEndpoint('S3Endpoint', { service: ec2.GatewayVpcEndpointAwsService.S3 });
 
     const apiHandler = new lambda.Function(this, 'ApiHandler', {
       runtime: lambda.Runtime.NODEJS_20_X,
@@ -155,37 +144,6 @@ export class CoreStack extends cdk.Stack {
       authorizationType: apigw.AuthorizationType.COGNITO,
     });
 
-    // Vehicles API
-    const vehicles = v1.addResource('vehicles');
-    vehicles.addMethod('GET', new apigw.LambdaIntegration(apiHandler), {
-      authorizer,
-      authorizationType: apigw.AuthorizationType.COGNITO,
-    });
-    vehicles.addMethod('POST', new apigw.LambdaIntegration(apiHandler), {
-      authorizer,
-      authorizationType: apigw.AuthorizationType.COGNITO,
-    });
-    const vehicleId = vehicles.addResource('{id}');
-    const costs = vehicleId.addResource('costs');
-    costs.addMethod('GET', new apigw.LambdaIntegration(apiHandler), {
-      authorizer,
-      authorizationType: apigw.AuthorizationType.COGNITO,
-    });
-    costs.addMethod('POST', new apigw.LambdaIntegration(apiHandler), {
-      authorizer,
-      authorizationType: apigw.AuthorizationType.COGNITO,
-    });
-    const summary = vehicleId.addResource('summary');
-    summary.addMethod('GET', new apigw.LambdaIntegration(apiHandler), {
-      authorizer,
-      authorizationType: apigw.AuthorizationType.COGNITO,
-    });
-    const metrics = vehicleId.addResource('metrics');
-    metrics.addMethod('GET', new apigw.LambdaIntegration(apiHandler), {
-      authorizer,
-      authorizationType: apigw.AuthorizationType.COGNITO,
-    });
-
     const nightly = new events.Rule(this, 'NightlyRule', {
       schedule: events.Schedule.cron({ minute: '0', hour: '2' }),
     });
@@ -237,6 +195,27 @@ export class CoreStack extends cdk.Stack {
       distributionPaths: ['/*'],
     });
 
+    // User pool client with Hosted UI (OAuth) config, now that we know callback URLs
+    const userPoolClient = new cognito.UserPoolClient(this, 'UserPoolClient', {
+      userPool,
+      supportedIdentityProviders: [cognito.UserPoolClientIdentityProvider.COGNITO],
+      oAuth: {
+        flows: { implicitCodeGrant: true, authorizationCodeGrant: true },
+        callbackUrls: [
+          `https://${appDomain}/callback`,
+          `https://${distro.domainName}/callback`,
+          'http://localhost:5173/callback',
+        ],
+        logoutUrls: [
+          `https://${appDomain}/`,
+          `https://${distro.domainName}/`,
+          'http://localhost:5173/',
+        ],
+        scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
+      },
+      generateSecret: false,
+    });
+
     // API custom domain api.the-libs.com
     const apiDomainNameValue = `api.${rootDomain}`;
     const apiCert = new acm.DnsValidatedCertificate(this, 'ApiCert', {
@@ -261,16 +240,10 @@ export class CoreStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'StaticEgressIp', { value: natEip.attrPublicIp });
     new cdk.CfnOutput(this, 'ApiUrl', { value: api.url ?? '' });
-    new cdk.CfnOutput(this, 'ApiCustomDomainUrl', {
-      value: `https://${apiDomainNameValue}`,
-    });
-    new cdk.CfnOutput(this, 'CloudFrontUrl', {
-      value: 'https://' + distro.domainName,
-    });
+    new cdk.CfnOutput(this, 'ApiCustomDomainUrl', { value: `https://${apiDomainNameValue}` });
+    new cdk.CfnOutput(this, 'CloudFrontUrl', { value: 'https://' + distro.domainName });
     new cdk.CfnOutput(this, 'AppDomain', { value: `https://${appDomain}` });
     new cdk.CfnOutput(this, 'UserPoolId', { value: userPool.userPoolId });
-    new cdk.CfnOutput(this, 'UserPoolClientId', {
-      value: userPoolClient.userPoolClientId,
-    });
+    new cdk.CfnOutput(this, 'UserPoolClientId', { value: userPoolClient.userPoolClientId });
   }
 }
