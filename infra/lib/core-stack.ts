@@ -94,6 +94,8 @@ export class CoreStack extends cdk.Stack {
         SALTEDGE_KEY: process.env.SALTEDGE_KEY ?? '',
         SALTEDGE_WEBHOOK_USER: process.env.SALTEDGE_WEBHOOK_USER ?? '',
         SALTEDGE_WEBHOOK_PASS: process.env.SALTEDGE_WEBHOOK_PASS ?? '',
+        ALLOWED_ORIGIN: `https://app.the-libs.com`,
+        SALTEDGE_CONSENT_SCOPES: process.env.SALTEDGE_CONSENT_SCOPES ?? '',
       },
       vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
@@ -105,6 +107,27 @@ export class CoreStack extends cdk.Stack {
       defaultCorsPreflightOptions: {
         allowOrigins: apigw.Cors.ALL_ORIGINS,
         allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowHeaders: apigw.Cors.DEFAULT_HEADERS,
+      },
+    });
+
+    // Ensure CORS headers exist on 4XX/5XX (e.g., Cognito auth failures)
+    new apigw.GatewayResponse(this, 'Default4XXCors', {
+      restApi: api,
+      type: apigw.ResponseType.DEFAULT_4XX,
+      responseHeaders: {
+        'Access-Control-Allow-Origin': "'*'",
+        'Access-Control-Allow-Headers': "'*'",
+        'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS'",
+      },
+    });
+    new apigw.GatewayResponse(this, 'Default5XXCors', {
+      restApi: api,
+      type: apigw.ResponseType.DEFAULT_5XX,
+      responseHeaders: {
+        'Access-Control-Allow-Origin': "'*'",
+        'Access-Control-Allow-Headers': "'*'",
+        'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS'",
       },
     });
     const authorizer = new apigw.CognitoUserPoolsAuthorizer(this, 'Authorizer', {

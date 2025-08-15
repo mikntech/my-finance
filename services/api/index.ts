@@ -10,6 +10,20 @@ import { randomUUID } from 'crypto';
 
 const ddb = new DynamoDBClient({});
 const TABLE = process.env.TABLE_NAME!;
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
+
+function json(statusCode: number, payload: any) {
+  const body = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  return {
+    statusCode,
+    headers: {
+      'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+      'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    },
+    body,
+  };
+}
 
 function userIdFromAuth(event: any): string | undefined {
   return event.requestContext?.authorizer?.claims?.sub;
@@ -130,18 +144,18 @@ async function getOrCreateCustomerId(identifier: string): Promise<string> {
 export const handler: APIGatewayProxyHandler = async (event) => {
   // Webhooks (no auth except optional Basic Auth)
   if (event.path.endsWith('/webhooks/saltedge')) {
-    if (!basicAuthOk(event)) return { statusCode: 401, body: 'Unauthorized' };
+    if (!basicAuthOk(event)) return json(401, 'Unauthorized');
     console.log('saltedge webhook', event.body);
-    return { statusCode: 200, body: 'ok' };
+    return json(200, 'ok');
   }
   if (event.path.endsWith('/webhooks/saltedge/providers')) {
-    if (!basicAuthOk(event)) return { statusCode: 401, body: 'Unauthorized' };
+    if (!basicAuthOk(event)) return json(401, 'Unauthorized');
     console.log('saltedge providers webhook', event.body);
-    return { statusCode: 200, body: 'ok' };
+    return json(200, 'ok');
   }
 
   const userId = userIdFromAuth(event);
-  if (!userId) return { statusCode: 401, body: 'Unauthorized' };
+  if (!userId) return json(401, 'Unauthorized');
 
   const { httpMethod, path } = event;
 
@@ -192,13 +206,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       }
       const res = await saltedgeRequest('/connect_sessions/create', payload);
       const connect_url = res?.data?.connect_url;
-      return { statusCode: 200, body: JSON.stringify({ connect_url }) };
+      return json(200, { connect_url });
     } catch (err: any) {
       console.error('connect/start error', err);
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: err?.message || 'connect_failed' }),
-      };
+      return json(500, { error: err?.message || 'connect_failed' });
     }
   }
 
@@ -219,7 +230,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       })
     );
     const items = (res.Items ?? []).map(unmarshall);
-    return { statusCode: 200, body: JSON.stringify({ items }) };
+    return json(200, { items });
   }
 
   if (path.endsWith('/transactions') && httpMethod === 'POST') {
@@ -245,16 +256,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       source: body.source ?? 'api',
     };
     await ddb.send(new PutItemCommand({ TableName: TABLE, Item: marshall(item) }));
-    return {
-      statusCode: 201,
-      body: JSON.stringify({ ok: true, id, sk: item.sk }),
-    };
+    return json(201, { ok: true, id, sk: item.sk });
   }
 
   if (path.endsWith('/transactions') && httpMethod === 'PUT') {
     const body = JSON.parse(event.body ?? '{}');
     const sk = body.sk as string | undefined;
-    if (!sk) return { statusCode: 400, body: 'Missing sk' };
+    if (!sk) return json(400, 'Missing sk');
     const updates: string[] = [];
     const names: Record<string, any> = {};
     const values: Record<string, any> = {};
@@ -267,7 +275,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     }
     if (body.category !== undefined) addUpdate('category', body.category);
     if (body.merchantClean !== undefined) addUpdate('merchantClean', body.merchantClean);
-    if (updates.length === 0) return { statusCode: 400, body: 'No updatable fields' };
+    if (updates.length === 0) return json(400, 'No updatable fields');
     await ddb.send(
       new UpdateItemCommand({
         TableName: TABLE,
@@ -277,22 +285,19 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         ExpressionAttributeValues: values,
       })
     );
-    return { statusCode: 200, body: JSON.stringify({ ok: true }) };
+    return json(200, { ok: true });
   }
 
   if (path.endsWith('/budgets') && httpMethod === 'GET') {
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        month: new Date().toISOString().slice(0, 7),
-        categories: [],
-      }),
-    };
+    return json(200, {
+      month: new Date().toISOString().slice(0, 7),
+      categories: [],
+    });
   }
 
   if (path.endsWith('/budgets') && httpMethod === 'PUT') {
-    return { statusCode: 200, body: JSON.stringify({ ok: true }) };
+    return json(200, { ok: true });
   }
 
-  return { statusCode: 404, body: 'Not found' };
+  return json(404, 'Not found');
 };
