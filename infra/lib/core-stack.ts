@@ -52,18 +52,23 @@ export class CoreStack extends cdk.Stack {
       autoDeleteObjects: true,
     });
 
-    const userPool = new cognito.UserPool(this, 'UserPool', {
-      selfSignUpEnabled: true,
-      signInAliases: { email: true },
-      passwordPolicy: { minLength: 12 },
-      mfa: cognito.Mfa.OFF,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-    // Hosted UI domain (uses prefix 'tem')
-    const hostedDomain = new cognito.UserPoolDomain(this, 'UserPoolHostedDomain', {
-      userPool,
-      cognitoDomain: { domainPrefix: 'tem' },
-    });
+    const existingUserPoolId = process.env.EXISTING_USER_POOL_ID;
+    const userPool: cognito.IUserPool = existingUserPoolId
+      ? cognito.UserPool.fromUserPoolId(this, 'ImportedUserPool', existingUserPoolId)
+      : new cognito.UserPool(this, 'UserPool', {
+          selfSignUpEnabled: true,
+          signInAliases: { email: true },
+          passwordPolicy: { minLength: 12 },
+          mfa: cognito.Mfa.OFF,
+          removalPolicy: cdk.RemovalPolicy.DESTROY,
+        });
+    // Hosted UI domain: only create when creating a new pool
+    const hostedDomain = existingUserPoolId
+      ? undefined
+      : new cognito.UserPoolDomain(this, 'UserPoolHostedDomain', {
+          userPool: userPool as cognito.UserPool,
+          cognitoDomain: { domainPrefix: 'tem' },
+        });
 
     // VPC with fixed egress IP via NAT Gateway (Elastic IP)
     const natEip = new ec2.CfnEIP(this, 'NatEip', { domain: 'vpc' });
@@ -228,25 +233,27 @@ export class CoreStack extends cdk.Stack {
     });
 
     // User pool client with Hosted UI (OAuth) config, now that we know callback URLs
-    const userPoolClient = new cognito.UserPoolClient(this, 'UserPoolClient', {
-      userPool,
-      supportedIdentityProviders: [cognito.UserPoolClientIdentityProvider.COGNITO],
-      oAuth: {
-        flows: { implicitCodeGrant: true, authorizationCodeGrant: true },
-        callbackUrls: [
-          `https://${appDomain}/callback`,
-          `https://${distro.domainName}/callback`,
-          'http://localhost:5173/callback',
-        ],
-        logoutUrls: [
-          `https://${appDomain}/`,
-          `https://${distro.domainName}/`,
-          'http://localhost:5173/',
-        ],
-        scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
-      },
-      generateSecret: false,
-    });
+    const userPoolClient = existingUserPoolId
+      ? undefined
+      : new cognito.UserPoolClient(this, 'UserPoolClient', {
+          userPool: userPool as cognito.UserPool,
+          supportedIdentityProviders: [cognito.UserPoolClientIdentityProvider.COGNITO],
+          oAuth: {
+            flows: { implicitCodeGrant: true, authorizationCodeGrant: true },
+            callbackUrls: [
+              `https://${appDomain}/callback`,
+              `https://${distro.domainName}/callback`,
+              'http://localhost:5173/callback',
+            ],
+            logoutUrls: [
+              `https://${appDomain}/`,
+              `https://${distro.domainName}/`,
+              'http://localhost:5173/',
+            ],
+            scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
+          },
+          generateSecret: false,
+        });
 
     // API custom domain api.the-libs.com
     const apiDomainNameValue = `api.${rootDomain}`;
@@ -275,8 +282,10 @@ export class CoreStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ApiCustomDomainUrl', { value: `https://${apiDomainNameValue}` });
     new cdk.CfnOutput(this, 'CloudFrontUrl', { value: 'https://' + distro.domainName });
     new cdk.CfnOutput(this, 'AppDomain', { value: `https://${appDomain}` });
-    new cdk.CfnOutput(this, 'UserPoolId', { value: userPool.userPoolId });
-    new cdk.CfnOutput(this, 'UserPoolClientId', { value: userPoolClient.userPoolClientId });
-    new cdk.CfnOutput(this, 'HostedUiDomain', { value: hostedDomain.baseUrl() });
+    if (!existingUserPoolId) {
+      new cdk.CfnOutput(this, 'UserPoolId', { value: (userPool as cognito.UserPool).userPoolId });
+      new cdk.CfnOutput(this, 'UserPoolClientId', { value: (userPoolClient as cognito.UserPoolClient).userPoolClientId });
+      new cdk.CfnOutput(this, 'HostedUiDomain', { value: (hostedDomain as cognito.UserPoolDomain).baseUrl() });
+    }
   }
 }
