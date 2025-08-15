@@ -1,0 +1,17 @@
+{
+  "name": "my-finance-monorepo",
+  "private": true,
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "dev:web": "pnpm --filter il-pfm-web dev",
+    "build:web": "pnpm --filter il-pfm-web build",
+    "build:api": "pnpm --filter il-pfm-api build",
+    "synth": "pnpm --filter il-pfm-infra synth",
+    "deploy": "pnpm --filter il-pfm-infra cdk:deploy",
+    "bootstrap": "pnpm --filter il-pfm-infra cdk:bootstrap"
+  },
+  "devDependencies": {
+    "nx": "19.8.4"
+  }
+}
