@@ -227,7 +227,7 @@ export class CoreStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, "ApiUrl", { value: api.url ?? "" });
-    new cdk.CfnOutput(this, "ApiCustomDomain", {
+    new cdk.CfnOutput(this, "ApiCustomDomainUrl", {
       value: `https://${apiDomainNameValue}`,
     });
     new cdk.CfnOutput(this, "CloudFrontUrl", {
