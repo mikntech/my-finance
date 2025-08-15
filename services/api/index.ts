@@ -72,22 +72,40 @@ async function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function parseNumericId(id: unknown): number | undefined {
+  if (typeof id === 'number' && Number.isFinite(id)) return id;
+  if (typeof id === 'string') {
+    const n = Number(id);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
 async function findCustomerIdByIdentifier(identifier: string): Promise<number | undefined> {
   // 1) Direct search
   try {
     const res = await saltedgeGet(
       `/customers?search[identifier]=${encodeURIComponent(identifier)}&per_page=100`
     );
-    const id = res?.data?.[0]?.id;
+    const id = parseNumericId(res?.data?.[0]?.id);
+    if (typeof id === 'number') return id;
+  } catch {}
+  // 1b) Alternate query param form seen in some gateways
+  try {
+    const res = await saltedgeGet(
+      `/customers?identifier=${encodeURIComponent(identifier)}&per_page=100`
+    );
+    const id = parseNumericId(res?.data?.[0]?.id);
     if (typeof id === 'number') return id;
   } catch {}
   // 2) Paginate list (handles accounts with multiple customers)
   let nextPath: string | undefined = '/customers?per_page=100';
-  for (let i = 0; i < 10 && nextPath; i++) {
+  for (let i = 0; i < 30 && nextPath; i++) {
     const res = await saltedgeGet(nextPath);
     const list = Array.isArray(res?.data) ? res.data : [];
     const match = list.find((c: any) => c?.identifier === identifier);
-    if (match?.id && typeof match.id === 'number') return match.id;
+    const parsed = parseNumericId(match?.id);
+    if (typeof parsed === 'number') return parsed;
     const meta = res?.meta || {};
     if (meta?.next_page) nextPath = `/customers?page=${meta.next_page}&per_page=100`;
     else if (meta?.next_id) nextPath = `/customers?from_id=${meta.next_id}&per_page=100`;
@@ -102,7 +120,7 @@ async function findCustomerIdByIdentifier(identifier: string): Promise<number | 
 async function getOrCreateCustomerId(identifier: string): Promise<number> {
   try {
     const created = await saltedgeRequest('/customers', { data: { identifier } });
-    const id = created?.data?.id;
+    const id = parseNumericId(created?.data?.id);
     if (typeof id === 'number') return id;
   } catch (e: any) {
     const msg = String(e?.message || '');
@@ -154,6 +172,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
           consent: { scopes: ['account_details', 'transactions'] },
         },
       };
+      // Defensive: some tenants expect app/country codes as uppercase
+      if (typeof payload.data.country_code === 'string') {
+        payload.data.country_code = payload.data.country_code.toUpperCase();
+      }
       const res = await saltedgeRequest('/connect_sessions/create', payload);
       const connect_url = res?.data?.connect_url;
       return { statusCode: 200, body: JSON.stringify({ connect_url }) };
