@@ -150,18 +150,40 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       const body = JSON.parse(event.body ?? '{}');
       const country_code = body.country_code || 'IL';
       const provider_code = body.provider_code; // optional preselected provider
+      const bodyScopes: unknown = body.scopes;
 
       const identifier = `USER#${userId}`;
       const customer_id = await getOrCreateCustomerId(identifier);
 
       const redirect_url_success = `https://${process.env.APP_DOMAIN || 'app.the-libs.com'}/connect/success`;
+      function getConsentScopes(): string[] {
+        if (Array.isArray(bodyScopes) && bodyScopes.every((s) => typeof s === 'string')) {
+          return bodyScopes as string[];
+        }
+        const fromEnv = process.env.SALTEDGE_CONSENT_SCOPES || '';
+        if (fromEnv) {
+          try {
+            const parsed = JSON.parse(fromEnv);
+            if (Array.isArray(parsed) && parsed.every((s) => typeof s === 'string')) return parsed;
+          } catch {}
+          const csv = fromEnv
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
+          if (csv.length) return csv;
+        }
+        // Safe default for AISP v5
+        return ['account_details', 'transactions_details'];
+      }
+      const scopes = getConsentScopes();
       const payload: any = {
         data: {
           customer_id, // keep as string to preserve precision
           country_code,
-          attempt: { return_to: redirect_url_success },
+          attempt: { return_to: redirect_url_success, user_present: true },
           ...(provider_code ? { provider_code } : {}),
-          consent: { scopes: ['account_details', 'transactions'] },
+          consent: { scopes },
+          api_version: '5',
         },
       };
       // Defensive: some tenants expect app/country codes as uppercase
