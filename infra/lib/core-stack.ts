@@ -85,6 +85,7 @@ export class CoreStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset('../services/api/dist'),
+      timeout: cdk.Duration.seconds(20),
       environment: {
         TABLE_NAME: table.tableName,
         BUCKET_NAME: statementsBucket.bucketName,
