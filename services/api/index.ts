@@ -75,7 +75,12 @@ async function getOrCreateCustomerId(identifier: string): Promise<number> {
     if (typeof id === 'number') return id;
   } catch (e: any) {
     const msg = String(e?.message || '');
-    if (!msg.includes('identifier has already been taken')) {
+    // Salt Edge may return 409 DuplicatedCustomer or similar wording
+    const isDuplicate =
+      msg.includes('DuplicatedCustomer') ||
+      msg.includes('already exists') ||
+      msg.includes('identifier has already been taken');
+    if (!isDuplicate) {
       throw e;
     }
   }
