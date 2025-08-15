@@ -70,8 +70,13 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: CDK Bootstrap (first run only)
-        if: ${{ github.event.inputs.bootstrap == 'true' }}
+      - name: Check CDK bootstrap stack
+        id: check_bootstrap
+        continue-on-error: true
+        run: aws cloudformation describe-stacks --stack-name CDKToolkit --region $AWS_REGION
+
+      - name: CDK Bootstrap (auto if not bootstrapped)
+        if: ${{ steps.check_bootstrap.outcome == 'failure' || github.event.inputs.bootstrap == 'true' }}
         run: pnpm --filter il-pfm-infra cdk:bootstrap
 
       - name: CDK Synth
