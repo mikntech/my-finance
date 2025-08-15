@@ -9,9 +9,20 @@
     "build:api": "pnpm --filter il-pfm-api build",
     "synth": "pnpm --filter il-pfm-infra synth",
     "deploy": "pnpm --filter il-pfm-infra cdk:deploy",
-    "bootstrap": "pnpm --filter il-pfm-infra cdk:bootstrap"
+    "bootstrap": "pnpm --filter il-pfm-infra cdk:bootstrap",
+    "lint": "pnpm -r run lint",
+    "lint:fix": "pnpm -r run lint:fix",
+    "format": "prettier -c .",
+    "format:fix": "prettier -w .",
+    "prepare": "husky"
   },
   "devDependencies": {
-    "nx": "19.8.4"
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^9.33.0",
+    "eslint-config-prettier": "^9.1.2",
+    "husky": "^9.1.7",
+    "nx": "19.8.4",
+    "prettier": "^3.6.2"
   }
 }
