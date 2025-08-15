@@ -1,5 +1,5 @@
 packages:
-  - "infra"
-  - "services/*"
-  - "web"
-  - "shared"
+  - 'infra'
+  - 'services/*'
+  - 'web'
+  - 'shared'
