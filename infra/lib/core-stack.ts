@@ -59,7 +59,11 @@ export class CoreStack extends cdk.Stack {
       mfa: cognito.Mfa.OFF,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
-    // NOTE: UserPoolClient will be created later after we know callback URLs
+    // Hosted UI domain (uses prefix 'tem')
+    const hostedDomain = new cognito.UserPoolDomain(this, 'UserPoolHostedDomain', {
+      userPool,
+      cognitoDomain: { domainPrefix: 'tem' },
+    });
 
     // VPC with fixed egress IP via NAT Gateway (Elastic IP)
     const natEip = new ec2.CfnEIP(this, 'NatEip', { domain: 'vpc' });
@@ -245,5 +249,6 @@ export class CoreStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'AppDomain', { value: `https://${appDomain}` });
     new cdk.CfnOutput(this, 'UserPoolId', { value: userPool.userPoolId });
     new cdk.CfnOutput(this, 'UserPoolClientId', { value: userPoolClient.userPoolClientId });
+    new cdk.CfnOutput(this, 'HostedUiDomain', { value: hostedDomain.baseUrl() });
   }
 }
