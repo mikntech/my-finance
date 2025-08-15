@@ -72,6 +72,34 @@ async function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function findCustomerIdByIdentifier(identifier: string): Promise<number | undefined> {
+  // 1) Direct search
+  try {
+    const res = await saltedgeGet(
+      `/customers?search[identifier]=${encodeURIComponent(identifier)}&per_page=100`
+    );
+    const id = res?.data?.[0]?.id;
+    if (typeof id === 'number') return id;
+  } catch {}
+  // 2) Paginate list (handles accounts with multiple customers)
+  let nextPath: string | undefined = '/customers?per_page=100';
+  for (let i = 0; i < 10 && nextPath; i++) {
+    const res = await saltedgeGet(nextPath);
+    const list = Array.isArray(res?.data) ? res.data : [];
+    const match = list.find((c: any) => c?.identifier === identifier);
+    if (match?.id && typeof match.id === 'number') return match.id;
+    const meta = res?.meta || {};
+    // support different pagination styles (next_page, next_id, links.next)
+    if (meta?.next_page) nextPath = `/customers?page=${meta.next_page}&per_page=100`;
+    else if (meta?.next_id) nextPath = `/customers?from_id=${meta.next_id}&per_page=100`;
+    else if (res?.links?.next)
+      nextPath = String(res.links.next).replace('https://www.saltedge.com/api/v5', '');
+    else nextPath = undefined;
+    await delay(200 * (i + 1));
+  }
+  return undefined;
+}
+
 async function getOrCreateCustomerId(identifier: string): Promise<number> {
   try {
     const created = await saltedgeRequest('/customers', { data: { identifier } });
@@ -83,31 +111,10 @@ async function getOrCreateCustomerId(identifier: string): Promise<number> {
       msg.includes('DuplicatedCustomer') ||
       msg.includes('already exists') ||
       msg.includes('identifier has already been taken');
-    if (!isDuplicate) {
-      throw e;
-    }
+    if (!isDuplicate) throw e;
   }
-  // Fetch existing by identifier, retry for eventual consistency
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const res = await saltedgeGet(
-      `/customers?search[identifier]=${encodeURIComponent(identifier)}`
-    );
-    const match = Array.isArray(res?.data)
-      ? res.data.find((c: any) => c?.identifier === identifier || typeof c?.id === 'number')
-      : undefined;
-    const id = match?.id ?? res?.data?.[0]?.id;
-    if (typeof id === 'number') return id;
-    await delay(300 * (attempt + 1));
-  }
-  // Fallback: list and filter client-side
-  const list = await saltedgeGet('/customers');
-  const match = Array.isArray(list?.data)
-    ? list.data.find((c: any) => c?.identifier === identifier)
-    : undefined;
-  const id = match?.id;
-  if (typeof id !== 'number') {
-    throw new Error('Could not resolve Salt Edge customer_id');
-  }
+  const id = await findCustomerIdByIdentifier(identifier);
+  if (typeof id !== 'number') throw new Error('Could not resolve Salt Edge customer_id');
   return id;
 }
 
