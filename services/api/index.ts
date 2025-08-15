@@ -50,6 +50,44 @@ async function saltedgeRequest(path: string, body: any) {
   return resp.json();
 }
 
+async function saltedgeGet(path: string) {
+  const appId = process.env.SALTEDGE_ID!;
+  const secret = process.env.SALTEDGE_KEY!;
+  const resp = await fetch(`https://www.saltedge.com/api/v5${path}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      'App-id': appId,
+      Secret: secret,
+    },
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`SaltEdge GET ${path} failed: ${resp.status} ${text}`);
+  }
+  return resp.json();
+}
+
+async function getOrCreateCustomerId(identifier: string): Promise<number> {
+  try {
+    const created = await saltedgeRequest('/customers', { data: { identifier } });
+    const id = created?.data?.id;
+    if (typeof id === 'number') return id;
+  } catch (e: any) {
+    const msg = String(e?.message || '');
+    if (!msg.includes('identifier has already been taken')) {
+      throw e;
+    }
+  }
+  // Fetch existing by identifier
+  const res = await saltedgeGet(`/customers?search[identifier]=${encodeURIComponent(identifier)}`);
+  const id = res?.data?.[0]?.id;
+  if (typeof id !== 'number') {
+    throw new Error('Could not resolve Salt Edge customer_id');
+  }
+  return id;
+}
+
 export const handler: APIGatewayProxyHandler = async (event) => {
   // Webhooks (no auth except optional Basic Auth)
   if (event.path.endsWith('/webhooks/saltedge')) {
@@ -74,33 +112,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       const country_code = body.country_code || 'IL';
       const provider_code = body.provider_code; // optional preselected provider
 
-      // 1) Ensure customer exists (idempotent by identifier)
       const identifier = `USER#${userId}`;
-      try {
-        await saltedgeRequest('/customers', { data: { identifier } });
-      } catch (e: any) {
-        // If already exists, proceed
-        if (!String(e?.message || '').includes('identifier has already been taken')) {
-          throw e;
-        }
-      }
+      const customer_id = await getOrCreateCustomerId(identifier);
 
-      // 2) Create connect session
-      const redirect_url_success = `https://${
-        process.env.APP_DOMAIN || 'app.the-libs.com'
-      }/connect/success`;
-      const redirect_url_fail = `https://${
-        process.env.APP_DOMAIN || 'app.the-libs.com'
-      }/connect/fail`;
+      const redirect_url_success = `https://${process.env.APP_DOMAIN || 'app.the-libs.com'}/connect/success`;
       const payload: any = {
         data: {
-          customer_id: identifier,
+          customer_id, // numeric id
           country_code,
           attempt: { return_to: redirect_url_success },
-          // Optional provider preselection
           ...(provider_code ? { provider_code } : {}),
           consent: { scopes: ['account_details', 'transactions'] },
-          // Use your API webhook Notify URL configured in Salt Edge dashboard
         },
       };
       const res = await saltedgeRequest('/connect_sessions/create', payload);
