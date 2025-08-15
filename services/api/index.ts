@@ -68,6 +68,10 @@ async function saltedgeGet(path: string) {
   return resp.json();
 }
 
+async function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function getOrCreateCustomerId(identifier: string): Promise<number> {
   try {
     const created = await saltedgeRequest('/customers', { data: { identifier } });
@@ -75,7 +79,6 @@ async function getOrCreateCustomerId(identifier: string): Promise<number> {
     if (typeof id === 'number') return id;
   } catch (e: any) {
     const msg = String(e?.message || '');
-    // Salt Edge may return 409 DuplicatedCustomer or similar wording
     const isDuplicate =
       msg.includes('DuplicatedCustomer') ||
       msg.includes('already exists') ||
@@ -84,9 +87,24 @@ async function getOrCreateCustomerId(identifier: string): Promise<number> {
       throw e;
     }
   }
-  // Fetch existing by identifier
-  const res = await saltedgeGet(`/customers?search[identifier]=${encodeURIComponent(identifier)}`);
-  const id = res?.data?.[0]?.id;
+  // Fetch existing by identifier, retry for eventual consistency
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await saltedgeGet(
+      `/customers?search[identifier]=${encodeURIComponent(identifier)}`
+    );
+    const match = Array.isArray(res?.data)
+      ? res.data.find((c: any) => c?.identifier === identifier || typeof c?.id === 'number')
+      : undefined;
+    const id = match?.id ?? res?.data?.[0]?.id;
+    if (typeof id === 'number') return id;
+    await delay(300 * (attempt + 1));
+  }
+  // Fallback: list and filter client-side
+  const list = await saltedgeGet('/customers');
+  const match = Array.isArray(list?.data)
+    ? list.data.find((c: any) => c?.identifier === identifier)
+    : undefined;
+  const id = match?.id;
   if (typeof id !== 'number') {
     throw new Error('Could not resolve Salt Edge customer_id');
   }
