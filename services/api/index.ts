@@ -15,7 +15,35 @@ function userIdFromAuth(event: any): string | undefined {
   return event.requestContext?.authorizer?.claims?.sub;
 }
 
+function basicAuthOk(event: any): boolean {
+  const user = process.env.SALTEDGE_WEBHOOK_USER || "";
+  const pass = process.env.SALTEDGE_WEBHOOK_PASS || "";
+  if (!user && !pass) return true; // disabled
+  const header = event.headers?.authorization || event.headers?.Authorization;
+  if (!header?.startsWith("Basic ")) return false;
+  try {
+    const decoded = Buffer.from(header.slice(6), "base64").toString("utf8");
+    const [u, p] = decoded.split(":");
+    return u === user && p === pass;
+  } catch {
+    return false;
+  }
+}
+
 export const handler: APIGatewayProxyHandler = async (event) => {
+  // Webhooks (no auth except optional Basic Auth)
+  if (event.path.endsWith("/webhooks/saltedge")) {
+    if (!basicAuthOk(event)) return { statusCode: 401, body: "Unauthorized" };
+    // TODO: verify signature if configured, and enqueue processing
+    console.log("saltedge webhook", event.body);
+    return { statusCode: 200, body: "ok" };
+  }
+  if (event.path.endsWith("/webhooks/saltedge/providers")) {
+    if (!basicAuthOk(event)) return { statusCode: 401, body: "Unauthorized" };
+    console.log("saltedge providers webhook", event.body);
+    return { statusCode: 200, body: "ok" };
+  }
+
   const userId = userIdFromAuth(event);
   if (!userId) return { statusCode: 401, body: "Unauthorized" };
 

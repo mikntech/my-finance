@@ -96,6 +96,10 @@ export class CoreStack extends cdk.Stack {
         TABLE_NAME: table.tableName,
         BUCKET_NAME: statementsBucket.bucketName,
         REGION: this.region,
+        SALTEDGE_ID: process.env.SALTEDGE_ID ?? "",
+        SALTEDGE_KEY: process.env.SALTEDGE_KEY ?? "",
+        SALTEDGE_WEBHOOK_USER: process.env.SALTEDGE_WEBHOOK_USER ?? "",
+        SALTEDGE_WEBHOOK_PASS: process.env.SALTEDGE_WEBHOOK_PASS ?? "",
       },
       vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
@@ -139,6 +143,13 @@ export class CoreStack extends cdk.Stack {
       authorizer,
       authorizationType: apigw.AuthorizationType.COGNITO,
     });
+
+    // Webhooks (no Cognito auth; Basic Auth is enforced in handler)
+    const webhooks = v1.addResource("webhooks");
+    const saltedge = webhooks.addResource("saltedge");
+    saltedge.addMethod("POST", new apigw.LambdaIntegration(apiHandler));
+    const providers = saltedge.addResource("providers");
+    providers.addMethod("POST", new apigw.LambdaIntegration(apiHandler));
 
     // Vehicles API
     const vehicles = v1.addResource("vehicles");
