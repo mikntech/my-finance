@@ -2,10 +2,10 @@
   "name": "il-pfm-api",
   "version": "0.1.0",
   "private": true,
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "build": "esbuild index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=index.js",
-    "watch": "esbuild index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=index.js --watch"
+    "build": "esbuild index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/index.js",
+    "watch": "esbuild index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/index.js --watch"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.611.0",

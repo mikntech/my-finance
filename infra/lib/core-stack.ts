@@ -91,7 +91,7 @@ export class CoreStack extends cdk.Stack {
     const apiHandler = new lambda.Function(this, "ApiHandler", {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "index.handler",
-      code: lambda.Code.fromAsset("../services/api"),
+      code: lambda.Code.fromAsset("../services/api/dist"),
       environment: {
         TABLE_NAME: table.tableName,
         BUCKET_NAME: statementsBucket.bucketName,
