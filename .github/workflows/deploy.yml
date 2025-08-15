@@ -1,0 +1,75 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bootstrap:
+        description: "Run CDK bootstrap (first-time setup)"
+        required: false
+        default: "false"
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-central-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Create web .env (optional)
+        if: ${{ secrets.VITE_API_URL != '' }}
+        run: |
+          echo "VITE_API_URL=${{ secrets.VITE_API_URL }}" > web/.env
+
+      - name: Build API
+        run: pnpm --filter il-pfm-api build
+
+      - name: Build Web
+        run: pnpm --filter il-pfm-web build
+
+      - name: Configure AWS credentials (OIDC)
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION || env.AWS_REGION }}
+
+      - name: Configure AWS credentials (Access Keys)
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME == '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || env.AWS_REGION }}
+
+      - name: CDK Bootstrap (first run only)
+        if: ${{ github.event.inputs.bootstrap == 'true' }}
+        run: pnpm --filter il-pfm-infra cdk:bootstrap
+
+      - name: CDK Synth
+        run: pnpm --filter il-pfm-infra synth
+
+      - name: CDK Deploy
+        run: pnpm --filter il-pfm-infra cdk:deploy
