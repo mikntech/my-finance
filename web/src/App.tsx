@@ -16,12 +16,34 @@ import ListAltIcon from "@mui/icons-material/ListAlt";
 import InsightsIcon from "@mui/icons-material/Insights";
 
 function SettingsPage() {
+  async function startConnect() {
+    const token = localStorage.getItem("idToken") || "";
+    const res = await fetch(
+      import.meta.env.VITE_API_URL + "/v1/connect/start",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify({ country_code: "IL" }),
+      }
+    );
+    const data = await res.json();
+    if (data?.connect_url) window.location.href = data.connect_url;
+    else alert("Connect failed: " + (data?.error || res.status));
+  }
   return (
     <Container sx={{ py: 2 }}>
       <Typography variant="h5" gutterBottom>
         הגדרות
       </Typography>
-      <Typography>חיבור בנקים וחברות אשראי (ממשק יתווסף בהמשך).</Typography>
+      <Typography sx={{ mb: 2 }}>
+        התחבר לבנקים וחברות אשראי כדי למשוך תנועות אוטומטית.
+      </Typography>
+      <Button variant="contained" onClick={() => void startConnect()}>
+        חיבור בנק/כרטיס
+      </Button>
     </Container>
   );
 }

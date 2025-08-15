@@ -151,6 +151,14 @@ export class CoreStack extends cdk.Stack {
     const providers = saltedge.addResource("providers");
     providers.addMethod("POST", new apigw.LambdaIntegration(apiHandler));
 
+    // Connect flow
+    const connect = v1.addResource("connect");
+    const start = connect.addResource("start");
+    start.addMethod("POST", new apigw.LambdaIntegration(apiHandler), {
+      authorizer,
+      authorizationType: apigw.AuthorizationType.COGNITO,
+    });
+
     // Vehicles API
     const vehicles = v1.addResource("vehicles");
     vehicles.addMethod("GET", new apigw.LambdaIntegration(apiHandler), {

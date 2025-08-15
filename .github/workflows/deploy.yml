@@ -70,6 +70,18 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Export aggregator secrets to env
+        env:
+          SALTEDGE_ID: ${{ secrets.SALTEDGE_ID }}
+          SALTEDGE_KEY: ${{ secrets.SALTEDGE_KEY }}
+          SALTEDGE_WEBHOOK_USER: ${{ secrets.SALTEDGE_WEBHOOK_USER }}
+          SALTEDGE_WEBHOOK_PASS: ${{ secrets.SALTEDGE_WEBHOOK_PASS }}
+        run: |
+          echo "SALTEDGE_ID=$SALTEDGE_ID" >> $GITHUB_ENV
+          echo "SALTEDGE_KEY=$SALTEDGE_KEY" >> $GITHUB_ENV
+          echo "SALTEDGE_WEBHOOK_USER=$SALTEDGE_WEBHOOK_USER" >> $GITHUB_ENV
+          echo "SALTEDGE_WEBHOOK_PASS=$SALTEDGE_WEBHOOK_PASS" >> $GITHUB_ENV
+
       - name: Check CDK bootstrap stack
         id: check_bootstrap
         continue-on-error: true
