@@ -1,4 +1,0 @@
-{
-  "app": "node -r ts-node/register bin/app.ts",
-  "context": {}
-}

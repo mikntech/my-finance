@@ -1,0 +1,13 @@
+{
+  "name": "backend-cdk",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "backend-cdk/cdk",
+  "projectType": "application",
+  "tags": ["cdk-app"],
+  "implicitDependencies": [],
+  "targets": {
+    "lint": {
+      "command": "eslint backend-cdk/**/*.ts"
+    }
+  }
+}

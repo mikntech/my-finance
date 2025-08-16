@@ -1,0 +1,16 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.toValidSsmParameterName = void 0;
+/**
+ * Filters out invalid SSM parameter name characters (https://docs.aws.amazon.com/systems-manager/latest/userguide/sysman-paramstore-su-create.html).
+ * Throws an error if the resulting name has zero length.
+ */
+const toValidSsmParameterName = (parameterName) => {
+    const validName = parameterName.replace(/[^a-zA-Z0-9_./-]/g, '');
+    if (!validName) {
+        throw new Error(`The valid SSM parameter name for '${parameterName}' is an empty string.`);
+    }
+    return validName;
+};
+exports.toValidSsmParameterName = toValidSsmParameterName;
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoidG8tdmFsaWQtc3NtLXBhcmFtZXRlci1uYW1lLmpzIiwic291cmNlUm9vdCI6IiIsInNvdXJjZXMiOlsiLi4vLi4vLi4vYmFja2VuZC1jZGsvY2RrL3RvLXZhbGlkLXNzbS1wYXJhbWV0ZXItbmFtZS50cyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiOzs7QUFBQTs7O0dBR0c7QUFDSSxNQUFNLHVCQUF1QixHQUFHLENBQUMsYUFBcUIsRUFBVSxFQUFFO0lBQ3ZFLE1BQU0sU0FBUyxHQUFHLGFBQWEsQ0FBQyxPQUFPLENBQUMsbUJBQW1CLEVBQUUsRUFBRSxDQUFDLENBQUM7SUFFakUsSUFBSSxDQUFDLFNBQVMsRUFBRSxDQUFDO1FBQ2YsTUFBTSxJQUFJLEtBQUssQ0FDYixxQ0FBcUMsYUFBYSx1QkFBdUIsQ0FDMUUsQ0FBQztJQUNKLENBQUM7SUFFRCxPQUFPLFNBQVMsQ0FBQztBQUNuQixDQUFDLENBQUM7QUFWVyxRQUFBLHVCQUF1QiwyQkFVbEMiLCJzb3VyY2VzQ29udGVudCI6WyIvKipcbiAqIEZpbHRlcnMgb3V0IGludmFsaWQgU1NNIHBhcmFtZXRlciBuYW1lIGNoYXJhY3RlcnMgKGh0dHBzOi8vZG9jcy5hd3MuYW1hem9uLmNvbS9zeXN0ZW1zLW1hbmFnZXIvbGF0ZXN0L3VzZXJndWlkZS9zeXNtYW4tcGFyYW1zdG9yZS1zdS1jcmVhdGUuaHRtbCkuXG4gKiBUaHJvd3MgYW4gZXJyb3IgaWYgdGhlIHJlc3VsdGluZyBuYW1lIGhhcyB6ZXJvIGxlbmd0aC5cbiAqL1xuZXhwb3J0IGNvbnN0IHRvVmFsaWRTc21QYXJhbWV0ZXJOYW1lID0gKHBhcmFtZXRlck5hbWU6IHN0cmluZyk6IHN0cmluZyA9PiB7XG4gIGNvbnN0IHZhbGlkTmFtZSA9IHBhcmFtZXRlck5hbWUucmVwbGFjZSgvW15hLXpBLVowLTlfLi8tXS9nLCAnJyk7XG5cbiAgaWYgKCF2YWxpZE5hbWUpIHtcbiAgICB0aHJvdyBuZXcgRXJyb3IoXG4gICAgICBgVGhlIHZhbGlkIFNTTSBwYXJhbWV0ZXIgbmFtZSBmb3IgJyR7cGFyYW1ldGVyTmFtZX0nIGlzIGFuIGVtcHR5IHN0cmluZy5gXG4gICAgKTtcbiAgfVxuXG4gIHJldHVybiB2YWxpZE5hbWU7XG59O1xuIl19

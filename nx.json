@@ -1,15 +1,29 @@
 {
-  "extends": "nx/presets/npm.json",
-  "tasksRunnerOptions": {
-    "default": {
-      "runner": "nx/tasks-runners/default",
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "nxCloudId": "68a086cedfff5d5aa526bf30",
+  "plugins": [
+    {
+      "plugin": "nx-serverless-cdk/plugin",
       "options": {
-        "cacheableOperations": ["build"]
+        "cdkTargetName": "cdk",
+        "deployTargetName": "deploy",
+        "deployAllTargetName": "deploy-all",
+        "destroyTargetName": "destroy",
+        "diffTargetName": "diff",
+        "lsTargetName": "ls",
+        "synthTargetName": "synth",
+        "watchTargetName": "watch",
+        "generateEventTargetName": "generate-event",
+        "invokeTargetName": "invoke",
+        "startApiTargetName": "start-api",
+        "startLambdaTargetName": "start-lambda"
+      }
+    },
+    {
+      "plugin": "@nx/eslint/plugin",
+      "options": {
+        "targetName": "lint"
       }
     }
-  },
-  "workspaceLayout": {
-    "appsDir": ".",
-    "libsDir": "shared"
-  }
+  ]
 }
