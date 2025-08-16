@@ -32,7 +32,6 @@ export class ExampleStack extends Stack {
 
     super(scope, id, stackProps);
 
-    // Sample Lambda to keep existing example behavior
     const exampleFunction = new NodejsFunction(this, 'ExampleFunction', {
       ...createDefaultLambdaProps({ environment, serviceName, build }),
       description: 'An example Lambda function.',
@@ -47,7 +46,6 @@ export class ExampleStack extends Stack {
       stringValue: exampleFunction.functionName,
     });
 
-    // Minimal-cost PostgreSQL RDS instance for development
     const vpc = ec2.Vpc.fromLookup(this, 'DefaultVpc', { isDefault: true });
 
     const dbSecurityGroup = new ec2.SecurityGroup(this, 'DbSecurityGroup', {
@@ -94,9 +92,14 @@ export class ExampleStack extends Stack {
       });
     }
 
-    // API for CRUD + query
+    // API with default CORS enabled
     const api = new apigateway.RestApi(this, 'SheetsApi', {
       deployOptions: { stageName: 'dev' },
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowMethods: apigateway.Cors.ALL_METHODS,
+        allowHeaders: ['Content-Type', 'Authorization'],
+      },
     });
 
     const commonEnv = {

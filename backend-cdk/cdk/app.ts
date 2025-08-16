@@ -145,3 +145,7 @@ export class EnvironmentStacks extends Construct {
     Tags.of(exampleStack).add('App', toValidTag(serviceName));
   }
 }
+
+export const exampleHandler = async () => {
+  return 'ok';
+};

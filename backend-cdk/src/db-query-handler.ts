@@ -7,6 +7,12 @@ import { Client } from 'pg';
 
 const secrets = new SecretsManagerClient({});
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+  'Access-Control-Allow-Methods': 'POST,OPTIONS',
+};
+
 async function getDbClient(): Promise<Client> {
   const secretArn = process.env['DB_SECRET_ARN']!;
   const host = process.env['DB_HOST']!;
@@ -36,23 +42,34 @@ async function getDbClient(): Promise<Client> {
 export const handler = async (
   event: APIGatewayProxyEventV2
 ): Promise<APIGatewayProxyResultV2> => {
+  if (event.requestContext.http.method === 'OPTIONS') {
+    return { statusCode: 204, headers: corsHeaders, body: '' };
+  }
+
+  let client: Client | undefined;
   try {
     const { text, params } = JSON.parse(event.body ?? '{}') as {
       text: string;
       params?: unknown[];
     };
     if (!text || !/^\s*select\s+/i.test(text)) {
-      return { statusCode: 400, body: 'Only SELECT queries are allowed' };
+      return { statusCode: 400, headers: corsHeaders, body: 'Only SELECT queries are allowed' };
     }
 
-    const client = await getDbClient();
+    client = await getDbClient();
     const res = await client.query(text, params);
-    await client.end();
-    return { statusCode: 200, body: JSON.stringify(res.rows) };
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(res.rows) };
   } catch (err) {
     return {
       statusCode: 500,
+      headers: corsHeaders,
       body: JSON.stringify({ message: 'Query error', err }),
     };
+  } finally {
+    if (client) {
+      try {
+        await client.end();
+      } catch {}
+    }
   }
 };
